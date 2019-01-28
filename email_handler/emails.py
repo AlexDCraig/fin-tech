@@ -1,6 +1,10 @@
+# Requirements: credentials.json file unique to your specific situation.
+# For now, must assume the email structures follows that of First Tech Federal Credit Union's daily messaging service.
+
 from __future__ import print_function
 
-import json
+import base64
+import email
 import os.path
 import pickle
 
@@ -12,7 +16,7 @@ from googleapiclient.discovery import build
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 # Adapted from Google.
-def setup_gmail_boilerplate():
+def get_gmail_messages():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
     """
@@ -37,59 +41,31 @@ def setup_gmail_boilerplate():
 
     service = build('gmail', 'v1', credentials=creds)
 
-    # Call the Gmail API
-    results = service.users().labels().list(userId='me').execute()
-    labels = results.get('labels', [])
+    # Get the unique ids of each email in the account.
+    response = service.users().messages().list(userId='me',
+                                               q='').execute()
+    messages = []
+    if 'messages' in response:
+        messages.extend(response['messages'])
 
-    if not labels:
-        print('No labels found.')
-    else:
-        print('Labels:')
-        for label in labels:
-            print(label['name'])
+    while 'nextPageToken' in response:
+        page_token = response['nextPageToken']
+        response = service.users().messages().list(userId='me', q='',
+                                                   pageToken=page_token).execute()
+        messages.extend(response['messages'])
 
-    return service
+    # Identify each email by its id. Collect its snippet and body.
+    emails = dict()
+    for i in range(len(messages)):
+        message_info = messages[i]
+        message_id = message_info['id']
+        message = service.users().messages().get(userId='me', id=message_id, format='raw').execute()
+        snippet = message['snippet']
+        msg_str = base64.urlsafe_b64decode(message['raw']).decode('utf-8')
+        mime_msg = email.message_from_string(msg_str)
+        emails[snippet] = mime_msg
 
-# Adapted from Google.
-def get_all_gmail_msg_ids(service, user_id, query):
-    try:
-        response = service.users().messages().list(userId=user_id,
-                                                   q=query).execute()
-        messages = []
-        if 'messages' in response:
-            messages.extend(response['messages'])
-
-        while 'nextPageToken' in response:
-            page_token = response['nextPageToken']
-            response = service.users().messages().list(userId=user_id, q=query,
-                                                       pageToken=page_token).execute()
-            messages.extend(response['messages'])
-
-        return messages
-    except Exception as e:
-        print('An error occurred: %s' % e)
-
-# Adapted from Google.
-def get_msg(service, user_id, msg_id):
-    try:
-        message = service.users().messages().get(userId=user_id, id=msg_id).execute()
-
-        print('Message snippet: %s' % message['snippet'])
-        return message
-    except Exception as e:
-        print('An error occurred: %s' % e)
-
-def get_msgs(service, user_id, msg_ids):
-    for i in range(len(msg_ids)):
-        msg_id = msg_ids[i]
-        msg = get_msg(service, user_id, msg_id)
-        print(msg)
-    return
+    return emails
 
 if __name__ == '__main__':
-    service = setup_gmail_boilerplate()
-    msg_ids = get_all_gmail_msg_ids(service, 'me', '')
-    # Problems with API due to log in
-    # https://developers.google.com/gmail/api/auth/web-server
-    # https://stackoverflow.com/questions/51881430/cant-authenticate-google-service-account-to-gmail
-    get_msgs(service, 'me', msg_ids)
+    emails = get_gmail_messages()
