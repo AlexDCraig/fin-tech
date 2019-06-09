@@ -3,10 +3,13 @@
 
 from __future__ import print_function
 
+import argparse
 import base64
 import email
 import os.path
 import pickle
+import re
+import string
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -68,4 +71,21 @@ def get_gmail_messages():
     return emails
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('account_to_analyze')
+    args = parser.parse_args()
+
+    account_to_analyze = args.account_to_analyze
     emails = get_gmail_messages()
+
+    balance_by_date = dict()
+    for email_header, email_body in emails.items():
+        email_header = str(email_header).replace('&#39;', "'")
+
+        if 'Your Balance Summary' in email_header and account_to_analyze in email_header:
+            try:
+                date = re.findall('(?:[0-9]{1,2}/){1,2}[0-9]{4}', email_header)[0]
+                balance = re.findall('\$\d+(?:\.\d+)?', email_header)[0]
+                balance_by_date[date] = balance
+            except:
+                continue
