@@ -9,11 +9,13 @@ import email
 import os.path
 import pickle
 import re
+from collections import OrderedDict
 import string
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from pymongo import MongoClient
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -78,7 +80,7 @@ if __name__ == '__main__':
     account_to_analyze = args.account_to_analyze
     emails = get_gmail_messages()
 
-    balance_by_date = dict()
+    balance_by_date = OrderedDict()
     for email_header, email_body in emails.items():
         email_header = str(email_header).replace('&#39;', "'")
 
@@ -89,3 +91,6 @@ if __name__ == '__main__':
                 balance_by_date[date] = balance
             except:
                 continue
+
+    # Connect to mongodb container.
+    client = MongoClient('midas-mongo-deployment:27017')
