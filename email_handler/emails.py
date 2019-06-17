@@ -9,8 +9,6 @@ import email
 import os.path
 import pickle
 import re
-from collections import OrderedDict
-import string
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -72,15 +70,8 @@ def get_gmail_messages():
 
     return emails
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('account_to_analyze')
-    args = parser.parse_args()
-
-    account_to_analyze = args.account_to_analyze
-    emails = get_gmail_messages()
-
-    balance_by_date = OrderedDict()
+def get_balance_by_date(emails, account_to_analyze):
+    balance_by_date = dict()
     for email_header, email_body in emails.items():
         email_header = str(email_header).replace('&#39;', "'")
 
@@ -92,5 +83,31 @@ if __name__ == '__main__':
             except:
                 continue
 
-    # Connect to mongodb container.
-    client = MongoClient('midas-mongo-deployment:27017')
+    return balance_by_date
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('account_to_analyze')
+
+    # Examples: if running locally, use 127.0.0.1:27017. If running mongodb as K8s deployment, use the name of the service with port 27017 attached.
+    parser.add_argument('mongodb_access_data')
+    args = parser.parse_args()
+
+    account_to_analyze = args.account_to_analyze
+    mongodb_access_data = args.mongodb_access_data
+    emails = get_gmail_messages()
+
+    balance_by_date = get_balance_by_date(emails, account_to_analyze)
+
+    # Connect to mongodb server.
+    client = MongoClient(mongodb_access_data)
+    financial_data_db = client.financial_data_db
+    overall_finances_collection = financial_data_db.overall_finances_collection
+
+    # Only publish a piece of data if it's not already in the database.
+    # cursor = overall_finances_collection.find()
+    # for record in cursor:
+        # print(record)
+
+    # Write banking data to the mongodb server.
+    overall_finances_collection.insert_one(balance_by_date)
