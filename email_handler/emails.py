@@ -95,6 +95,7 @@ if __name__ == '__main__':
 
     account_to_analyze = args.account_to_analyze
     mongodb_access_data = args.mongodb_access_data
+
     emails = get_gmail_messages()
 
     balance_by_date = get_balance_by_date(emails, account_to_analyze)
@@ -104,10 +105,9 @@ if __name__ == '__main__':
     financial_data_db = client.financial_data_db
     overall_finances_collection = financial_data_db.overall_finances_collection
 
-    # Only publish a piece of data if it's not already in the database.
-    # cursor = overall_finances_collection.find()
-    # for record in cursor:
-        # print(record)
+    # Delete the big block of financial data in there and replace with what we've found here.
+    cursor = overall_finances_collection.find()
+    overall_finances_collection.delete_one({'_id': cursor[0]['_id']})
 
     # Write banking data to the mongodb server.
     overall_finances_collection.insert_one(balance_by_date)
