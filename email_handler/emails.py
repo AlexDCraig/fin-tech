@@ -7,6 +7,7 @@ import argparse
 import base64
 import email
 import os.path
+import pandas
 import pickle
 import re
 
@@ -105,9 +106,15 @@ if __name__ == '__main__':
     financial_data_db = client.financial_data_db
     overall_finances_collection = financial_data_db.overall_finances_collection
 
+    print(balance_by_date)
+
     # Delete the big block of financial data in there and replace with what we've found here.
     cursor = overall_finances_collection.find()
-    overall_finances_collection.delete_one({'_id': cursor[0]['_id']})
 
-    # Write banking data to the mongodb server.
-    overall_finances_collection.insert_one(balance_by_date)
+    try:
+        overall_finances_collection.delete_one({'_id': cursor[0]['_id']})
+    except Exception as e:
+        print(str(e))
+    finally:
+        # Write banking data to the mongodb server.
+        overall_finances_collection.insert_one(balance_by_date)
